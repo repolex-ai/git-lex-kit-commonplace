@@ -14,7 +14,7 @@ NAME = "pinboard"
 API = "https://api.pinboard.in/v1"
 
 
-def fetch_items() -> list[Item]:
+def fetch_items(known=lambda url: False) -> list[Item]:
     token = os.environ.get("PINBOARD_TOKEN")
     if not token:
         raise SystemExit("Set PINBOARD_TOKEN (user:TOKEN, from https://pinboard.in/settings/password).")

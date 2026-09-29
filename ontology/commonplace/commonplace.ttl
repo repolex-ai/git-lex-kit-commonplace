@@ -1,0 +1,292 @@
+@prefix commonplace: <https://repolex.ai/ontology/commonplace/> .
+@prefix git-lex:     <https://repolex.ai/ontology/git-lex/> .
+@prefix owl:         <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs:        <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:         <http://www.w3.org/2001/XMLSchema#> .
+
+# =============================================================================
+# COMMONPLACE KIT ONTOLOGY
+# =============================================================================
+# A commonplace book: the old practice of copying what you read into one book,
+# arranged by subject, to think with later. Here the book keeps itself. Links
+# saved elsewhere (Pinboard, X, by hand) arrive as Bookmarks; a tool fetches
+# each page's text as a PageSource; an agent assesses each Bookmark in its own
+# body; research grows one Subject document per thing the reading is about;
+# connections across many bookmarks become Insights.
+#
+# Scope: personal bookmarks. Heavy-duty research is a different kit (reserved
+# name: marginalia).
+#
+# Kit: commonplace
+# Namespace: commonplace: = https://repolex.ai/ontology/commonplace/
+# Files: Commonplace/<Class>/<identifier>.md
+# Document types (= valid `git lex create` commands):
+#   bookmark, pagesource, subject, subjectkind, insight
+#
+# WHO WRITES WHAT:
+#   Bookmark (created), PageSource → the `commonplace` tool. Plain data.
+#   Bookmark (assessed: body, worth, status), Subject, SubjectKind, Insight
+#     → an agent, following the kit's skills.
+#
+# LINKS: structural edges are relatedToId (PageSource → Bookmark, Bookmark →
+# Subject, Insight → what it rests on). Markdown links in the body are the
+# connective tissue: prose saying HOW things relate. Obsidian's graph sees the
+# second kind, git-lex sees both.
+#
+# THE EVOLVABLE PART — SubjectKind is a CLASS, not an enum.
+# The kinds of subject (person, technology, idea…) are documents, not a closed
+# list in this file. The kit ships a starting set; an agent adds a new kind by
+# writing one document, with no ontology change and no kit release. subjectKind
+# points at a kind by bare id under a CONCRETE range (lane B), so git-lex
+# rejects a Subject naming a kind that does not exist — the vocabulary can
+# grow, but nothing can drift into it by typo. Experiment toward an evolvable
+# ontology; see the changelog.
+# =============================================================================
+
+<https://repolex.ai/ontology/commonplace> a owl:Ontology ;
+    rdfs:label "Commonplace Kit Ontology" ;
+    rdfs:comment "A commonplace book that keeps itself: saved links, their page text, assessments, subjects and insights." ;
+    owl:versionInfo "0.2.0" .
+
+# v0.2.0 (2026-09-28, goodlux-ruled, drafted by selkie): RENAMED bookmark → commonplace,
+#   and the model reshaped after Rob's review of v0.1.0.
+#   (1) Namespace and folders follow the fleet convention: Commonplace/<Class>/.
+#       (v0.1.0 used a non-standard Library/ folder.)
+#   (2) Assessment class REMOVED. The assessment lives in the Bookmark's body,
+#       with commonplace:worth on the Bookmark. One document per link.
+#   (3) + commonplace:bookmarkStatus (new / assessed / researched), Rob's call.
+#       Reader: the skills' work queues and the stored queries. It is a closed
+#       workflow, so a true enum.
+#   (4) Topic REPLACED by Subject: one document per thing the reading is about,
+#       grown by research. Research is not scattered; it accumulates on subjects.
+#   (5) + SubjectKind as a foldered class with seed documents, and
+#       commonplace:subjectKind (lane B, concrete range) on Subject. Rob refused a
+#       plain `kind` (too generic across subtexture) and wants an evolvable
+#       ontology; enums-as-documents is the first step that costs nothing.
+#   DELIBERATELY NOT ADDED:
+#   - A Source/Service class for account config. Secrets never go in a repo, and
+#     the sync cursor is derivable (stop at the first bookmark already present).
+#   - depth (quick/deep): bookmarkStatus researched carries it.
+#
+# v0.1.0 (2026-09-28): first cut as the "bookmark" kit.
+
+# -----------------------------------------------------------------------------
+# Bookmark — one saved link, and the agent's assessment of it
+# -----------------------------------------------------------------------------
+
+commonplace:Bookmark a owl:Class ;
+    rdfs:subClassOf git-lex:Thing ;
+    git-lex:foldered true ;
+    rdfs:label "Bookmark" ;
+    rdfs:comment "One saved link: what arrived from the source, then the agent's assessment below it." ;
+    git-lex:authoringGuidance """
+## Saved note
+What the person wrote when they saved it, verbatim. Empty if nothing.
+
+## From the source
+The source's own details: tags, the post text and its author for an X bookmark.
+
+## Assessment
+What the page is, why it might matter to this person, and what it connects to, with links.
+""" .
+
+commonplace:bookmarkId a owl:DatatypeProperty ;
+    rdfs:label "bookmarkId" ;
+    rdfs:comment "Unique identifier — same as the filename; the tool makes it from the page title and a hash of the URL, do not hand-pick one." ;
+    rdfs:domain commonplace:Bookmark ;
+    rdfs:range xsd:string .
+
+commonplace:url a owl:DatatypeProperty ;
+    rdfs:label "url" ;
+    rdfs:comment "The saved link, exactly as saved — do not clean or shorten it." ;
+    rdfs:domain commonplace:Bookmark ;
+    rdfs:range xsd:anyURI .
+
+commonplace:source a owl:DatatypeProperty ;
+    rdfs:label "source" ;
+    rdfs:comment "Where it was saved, lowercase: pinboard, x, manual, or another source's name." ;
+    rdfs:domain commonplace:Bookmark ;
+    rdfs:range xsd:string .
+
+commonplace:sourceId a owl:DatatypeProperty ;
+    rdfs:label "sourceId" ;
+    rdfs:comment "The item's id at its source (the X post id, the Pinboard hash) — never invent one." ;
+    rdfs:domain commonplace:Bookmark ;
+    rdfs:range xsd:string .
+
+commonplace:savedDate a owl:DatatypeProperty ;
+    rdfs:label "savedDate" ;
+    rdfs:comment "When it was saved at the source, ISO-8601 with offset — not when it was imported." ;
+    rdfs:domain commonplace:Bookmark ;
+    rdfs:range xsd:dateTime .
+
+commonplace:BookmarkStatusValue a rdfs:Datatype ;
+    owl:oneOf ( "new" "assessed" "researched" ) .
+
+commonplace:bookmarkStatus a owl:DatatypeProperty ;
+    rdfs:label "bookmarkStatus" ;
+    rdfs:comment "One of: new, assessed, researched. Only move it forward after the work is written." ;
+    rdfs:domain commonplace:Bookmark ;
+    rdfs:range commonplace:BookmarkStatusValue .
+
+commonplace:WorthValue a rdfs:Datatype ;
+    owl:oneOf ( "high" "medium" "low" ) .
+
+commonplace:worth a owl:DatatypeProperty ;
+    rdfs:label "worth" ;
+    rdfs:comment "One of: high, medium, low — worth reading in full, judged from the page text, not the title." ;
+    rdfs:domain commonplace:Bookmark ;
+    rdfs:range commonplace:WorthValue .
+
+# -----------------------------------------------------------------------------
+# PageSource — the page's readable text, fetched by the tool
+# -----------------------------------------------------------------------------
+
+commonplace:PageSource a owl:Class ;
+    rdfs:subClassOf git-lex:Thing ;
+    git-lex:foldered true ;
+    rdfs:label "PageSource" ;
+    rdfs:comment "The readable text of a bookmarked page, fetched once and kept. Written by the tool, not by hand." ;
+    git-lex:authoringGuidance """
+## Text
+The page's main content as markdown. Nothing added, nothing summarised.
+""" .
+
+commonplace:pageSourceId a owl:DatatypeProperty ;
+    rdfs:label "pageSourceId" ;
+    rdfs:comment "Unique identifier — the same as its Bookmark's id." ;
+    rdfs:domain commonplace:PageSource ;
+    rdfs:range xsd:string .
+
+commonplace:fetchedDate a owl:DatatypeProperty ;
+    rdfs:label "fetchedDate" ;
+    rdfs:comment "When the page was fetched, ISO-8601 with offset." ;
+    rdfs:domain commonplace:PageSource ;
+    rdfs:range xsd:dateTime .
+
+commonplace:finalUrl a owl:DatatypeProperty ;
+    rdfs:label "finalUrl" ;
+    rdfs:comment "The address the page was actually read from, after redirects." ;
+    rdfs:domain commonplace:PageSource ;
+    rdfs:range xsd:anyURI .
+
+commonplace:FetchStatusValue a rdfs:Datatype ;
+    owl:oneOf ( "ok" "failed" ) .
+
+commonplace:fetchStatus a owl:DatatypeProperty ;
+    rdfs:label "fetchStatus" ;
+    rdfs:comment "One of: ok, failed. A failed fetch keeps its reason in the body." ;
+    rdfs:domain commonplace:PageSource ;
+    rdfs:range commonplace:FetchStatusValue .
+
+# -----------------------------------------------------------------------------
+# Subject — one thing the reading is about; research accumulates here
+# -----------------------------------------------------------------------------
+
+commonplace:Subject a owl:Class ;
+    rdfs:subClassOf git-lex:Thing ;
+    git-lex:foldered true ;
+    rdfs:label "Subject" ;
+    rdfs:comment "One thing the reading is about — a person, a technology, an idea. Grows each time research touches it." ;
+    git-lex:authoringGuidance """
+## What it is
+The subject in a few plain sentences.
+
+## What the reading says
+What the bookmarks say about it, each claim linked to the bookmark it came from.
+
+## Related
+Other subjects it connects to, and how.
+""" .
+
+commonplace:subjectId a owl:DatatypeProperty ;
+    rdfs:label "subjectId" ;
+    rdfs:comment "Unique identifier — the subject's plain name in lowercase with dashes; same as the filename." ;
+    rdfs:domain commonplace:Subject ;
+    rdfs:range xsd:string .
+
+commonplace:subjectKind a owl:ObjectProperty ;
+    rdfs:label "subjectKind" ;
+    rdfs:comment "The kind of subject — the bare id of a SubjectKind document (person, technology…). Add a new SubjectKind rather than forcing a poor fit." ;
+    rdfs:domain commonplace:Subject ;
+    rdfs:range commonplace:SubjectKind .
+
+# -----------------------------------------------------------------------------
+# SubjectKind — the vocabulary of kinds, as documents (see header)
+# -----------------------------------------------------------------------------
+
+commonplace:SubjectKind a owl:Class ;
+    rdfs:subClassOf git-lex:Thing ;
+    git-lex:foldered true ;
+    rdfs:label "SubjectKind" ;
+    rdfs:comment "A kind of subject. Adding one is how the vocabulary grows — write what belongs in it and what does not." ;
+    git-lex:authoringGuidance """
+## What belongs
+What makes a subject this kind, with an example or two.
+
+## What does not
+The nearest other kind, and where the line between them is.
+""" .
+
+commonplace:subjectKindId a owl:DatatypeProperty ;
+    rdfs:label "subjectKindId" ;
+    rdfs:comment "Unique identifier — one lowercase word or dashed phrase; same as the filename." ;
+    rdfs:domain commonplace:SubjectKind ;
+    rdfs:range xsd:string .
+
+# -----------------------------------------------------------------------------
+# Insight — a connection found across several bookmarks
+# -----------------------------------------------------------------------------
+
+commonplace:Insight a owl:Class ;
+    rdfs:subClassOf git-lex:Thing ;
+    git-lex:foldered true ;
+    rdfs:label "Insight" ;
+    rdfs:comment "A connection found across several bookmarks — the payoff. Link every bookmark and subject it rests on." ;
+    git-lex:authoringGuidance """
+## The insight
+The finding, stated plainly in a sentence or two.
+
+## Where it came from
+Which bookmarks and subjects led to it, and what each one contributed.
+""" .
+
+commonplace:insightId a owl:DatatypeProperty ;
+    rdfs:label "insightId" ;
+    rdfs:comment "Unique identifier for this insight — same as the filename." ;
+    rdfs:domain commonplace:Insight ;
+    rdfs:range xsd:string .
+
+# -----------------------------------------------------------------------------
+# Cardinality
+# -----------------------------------------------------------------------------
+
+commonplace:Bookmark rdfs:subClassOf
+    [ a owl:Restriction ; owl:onProperty commonplace:bookmarkId     ; owl:minCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty commonplace:bookmarkId     ; owl:maxCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty commonplace:url            ; owl:minCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty commonplace:url            ; owl:maxCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty commonplace:source         ; owl:maxCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty commonplace:sourceId       ; owl:maxCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty commonplace:savedDate      ; owl:maxCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty commonplace:bookmarkStatus ; owl:maxCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty commonplace:worth          ; owl:maxCardinality 1 ] .
+
+commonplace:PageSource rdfs:subClassOf
+    [ a owl:Restriction ; owl:onProperty commonplace:pageSourceId ; owl:minCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty commonplace:pageSourceId ; owl:maxCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty commonplace:fetchedDate  ; owl:maxCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty commonplace:finalUrl     ; owl:maxCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty commonplace:fetchStatus  ; owl:maxCardinality 1 ] .
+
+commonplace:Subject rdfs:subClassOf
+    [ a owl:Restriction ; owl:onProperty commonplace:subjectId   ; owl:minCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty commonplace:subjectId   ; owl:maxCardinality 1 ] .
+
+commonplace:SubjectKind rdfs:subClassOf
+    [ a owl:Restriction ; owl:onProperty commonplace:subjectKindId ; owl:minCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty commonplace:subjectKindId ; owl:maxCardinality 1 ] .
+
+commonplace:Insight rdfs:subClassOf
+    [ a owl:Restriction ; owl:onProperty commonplace:insightId ; owl:minCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty commonplace:insightId ; owl:maxCardinality 1 ] .

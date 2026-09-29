@@ -9,7 +9,7 @@ import trafilatura
 # An X bookmark already carries the post text in its Bookmark body.
 SKIP_HOSTS = {"x.com", "twitter.com", "mobile.twitter.com"}
 
-HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; lex-bookmark; +https://github.com/repolex-ai/git-lex-kit-bookmark)"}
+HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; commonplace; +https://github.com/repolex-ai/git-lex-kit-commonplace)"}
 
 
 def page(url: str) -> tuple[bool, str, str, str]:

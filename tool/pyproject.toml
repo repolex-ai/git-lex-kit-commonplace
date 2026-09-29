@@ -1,7 +1,7 @@
 [project]
-name = "lex-bookmark"
+name = "commonplace"
 version = "0.1.0"
-description = "Bring bookmarks into a git-lex bookmark library and fetch their pages as readable markdown."
+description = "Bring bookmarks into a git-lex commonplace and fetch their pages as readable markdown."
 requires-python = ">=3.11"
 dependencies = [
     "httpx>=0.27",
@@ -9,7 +9,7 @@ dependencies = [
 ]
 
 [project.scripts]
-lex-bookmark = "lex_bookmark.cli:main"
+commonplace = "commonplace.cli:main"
 
 [build-system]
 requires = ["hatchling"]

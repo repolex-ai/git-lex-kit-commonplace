@@ -1,17 +1,17 @@
 # git-lex kit configuration
-# Bookmark kit — a reading library that tends itself: saved links come in,
+# Commonplace kit — a commonplace book that keeps itself: saved links come in,
 # their pages are fetched as text, and an agent assesses and connects them.
 
-name: bookmark
+name: commonplace
 
-# Domain kit: a bookmark library is its own repo, set up with
-# `git lex init --kit bookmark`.
+# Domain kit: a commonplace is its own repo, set up with
+# `git lex init --kit commonplace`.
 scope: domain
 
 # Folder installation — create class folders from the ontology.
 install folders: true
-folder base: Library
-folder ontology: bookmark.ttl
+folder base: Commonplace
+folder ontology: commonplace.ttl
 
 init_prompts:
   - agent_name

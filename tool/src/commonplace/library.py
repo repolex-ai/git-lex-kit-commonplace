@@ -1,7 +1,7 @@
-"""Writing Bookmark and PageSource documents into a bookmark library repo.
+"""Writing Bookmark and PageSource documents into a commonplace repo.
 
 Every document is started with `git lex create` and then filled in, and a run ends with one
-`git lex save`. The tool never writes Assessments, Topics or Insights; those are the agent's.
+`git lex save`. The tool never writes assessments, Subjects or Insights; those are the agent's.
 """
 
 import hashlib
@@ -13,14 +13,15 @@ from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 TRACKING = re.compile(r"^(utm_|fbclid$|gclid$|mc_|ref$|ref_src$|s$|t$)")
+NS = "commonplace"
 
 
-class Library:
+class Commonplace:
     def __init__(self, root: Path):
         self.root = root.resolve()
         if not (self.root / ".lex").is_dir():
-            raise SystemExit(f"{self.root} is not a git-lex repo. Run inside a bookmark library.")
-        self.folder = self.root / "Library"
+            raise SystemExit(f"{self.root} is not a git-lex repo. Run inside a commonplace.")
+        self.folder = self.root / "Commonplace"
 
     # ---- identity ---------------------------------------------------------------------------
 
@@ -35,11 +36,20 @@ class Library:
         return urlunsplit((parts.scheme.lower(), host, parts.path.rstrip("/"), query, ""))
 
     @classmethod
-    def id_for(cls, url: str) -> str:
-        norm = cls.normalize(url)
-        parts = urlsplit(norm)
-        slug = re.sub(r"[^a-z0-9]+", "-", f"{parts.netloc} {parts.path}".lower()).strip("-")[:60].strip("-")
-        return f"{slug}-{hashlib.sha1(norm.encode()).hexdigest()[:6]}"
+    def url_hash(cls, url: str) -> str:
+        return hashlib.sha1(cls.normalize(url).encode()).hexdigest()[:6]
+
+    @classmethod
+    def id_for(cls, url: str, title: str = "") -> str:
+        """A readable slug from the title (or the address when there is none), plus a hash of the
+        URL. The hash is what makes the same link saved twice one document."""
+        if title and not title.startswith(("http://", "https://")):
+            words = title
+        else:
+            parts = urlsplit(cls.normalize(url))
+            words = f"{parts.netloc} {parts.path}"
+        slug = re.sub(r"[^a-z0-9]+", "-", words.lower()).strip("-")[:60].strip("-") or "link"
+        return f"{slug}-{cls.url_hash(url)}"
 
     def path(self, cls: str, doc_id: str) -> Path:
         return self.folder / cls / f"{doc_id}.md"
@@ -47,11 +57,16 @@ class Library:
     def has(self, cls: str, doc_id: str) -> bool:
         return self.path(cls, doc_id).exists()
 
+    def find_bookmark(self, url: str) -> str | None:
+        """The id of the Bookmark for this URL, whatever its title slug, if there is one."""
+        found = sorted((self.folder / "Bookmark").glob(f"*-{self.url_hash(url)}.md"))
+        return found[0].stem if found else None
+
     def bookmark_ids(self) -> list[str]:
         return sorted(p.stem for p in (self.folder / "Bookmark").glob("*.md") if not p.name.startswith("__"))
 
     def bookmark_url(self, doc_id: str) -> str:
-        m = re.search(r"^bookmark\.Bookmark\.url:\s*(.+)$", self.path("Bookmark", doc_id).read_text(), re.M)
+        m = re.search(rf"^{NS}\.Bookmark\.url:\s*(.+)$", self.path("Bookmark", doc_id).read_text(), re.M)
         return json.loads(m.group(1)) if m else ""
 
     # ---- writing ----------------------------------------------------------------------------
@@ -64,10 +79,9 @@ class Library:
     def _write(self, cls: str, doc_id: str, fields: dict, body: str) -> None:
         """git lex create, then replace the template with the filled document."""
         self._git_lex("create", cls.lower(), doc_id)
-        prefix = f"bookmark.{cls}."
-        lines = ["---", f"type: {cls}", f"{prefix}id: <bookmark/{cls}/{doc_id}>"]
+        prefix = f"{NS}.{cls}."
         id_key = cls[0].lower() + cls[1:] + "Id"
-        lines.append(f"{prefix}{id_key}: {json.dumps(doc_id)}")
+        lines = ["---", f"type: {cls}", f"{prefix}id: <{NS}/{cls}/{doc_id}>", f"{prefix}{id_key}: {json.dumps(doc_id)}"]
         for key, value in fields.items():
             if value is None or value == "":
                 continue
@@ -82,17 +96,25 @@ class Library:
         self.path(cls, doc_id).write_text("\n".join(lines) + "\n\n" + body.strip() + "\n")
 
     def add_bookmark(self, item) -> str | None:
-        """Write a Bookmark for an item. Returns its id, or None if the library already has it."""
-        doc_id = self.id_for(item.url)
-        if self.has("Bookmark", doc_id):
+        """Write a Bookmark for an item. Returns its id, or None if the commonplace already has it."""
+        if self.find_bookmark(item.url):
             return None
         title = item.title.strip() or item.url
-        body = [f"# {title}", "", "## Saved note", "", item.note.strip(), "", "## From the source", ""]
-        body += item.details or (["Added by hand."] if item.source == "manual" else [f"Saved on {item.source}."])
+        doc_id = self.id_for(item.url, title)
+        details = item.details or (["Added by hand."] if item.source == "manual" else [f"Saved on {item.source}."])
+        body = [f"# {title}", "", "## Saved note", "", item.note.strip(), "", "## From the source", "", *details,
+                "", "## Assessment", "", "*Not assessed yet.*"]
         self._write(
             "Bookmark",
             doc_id,
-            {"title": title, "url": item.url, "source": item.source, "sourceId": item.source_id, "savedDate": item.saved},
+            {
+                "title": title,
+                "url": item.url,
+                "source": item.source,
+                "sourceId": item.source_id,
+                "savedDate": item.saved,
+                "bookmarkStatus": "new",
+            },
             "\n".join(body),
         )
         return doc_id
@@ -104,7 +126,7 @@ class Library:
             doc_id,
             {
                 "title": title,
-                "relatedToId": [f"<bookmark/Bookmark/{doc_id}>"],
+                "relatedToId": [f"<{NS}/Bookmark/{doc_id}>"],
                 "fetchedDate": datetime.now().astimezone().replace(microsecond=0),
                 "finalUrl": final_url,
                 "fetchStatus": "ok" if ok else "failed",

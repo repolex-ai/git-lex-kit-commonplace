@@ -1,8 +1,8 @@
 """X (x.com) bookmarks, through the official API.
 
 Needs your own developer app (developer.x.com) with OAuth 2.0 turned on, type "Native App",
-callback URL http://127.0.0.1:8723/callback, and X_CLIENT_ID set. Run `lex-bookmark auth x`
-once to sign in; the token is kept in ~/.config/lex-bookmark/, never in the library repo.
+callback URL http://127.0.0.1:8723/callback, and X_CLIENT_ID set. Run `commonplace auth x`
+once to sign in; the token is kept in ~/.config/commonplace/, never in the commonplace repo.
 
 Reading your own bookmarks with your own app is billed as an "Owned Read" (about $0.001 each
 since 2026-04-20). X does not say when a post was bookmarked, so savedDate is left empty.
@@ -29,7 +29,7 @@ AUTHORIZE = "https://x.com/i/oauth2/authorize"
 TOKEN = "https://api.x.com/2/oauth2/token"
 REDIRECT = "http://127.0.0.1:8723/callback"
 SCOPES = "tweet.read users.read bookmark.read offline.access"
-TOKEN_FILE = Path.home() / ".config" / "lex-bookmark" / "x-token.json"
+TOKEN_FILE = Path.home() / ".config" / "commonplace" / "x-token.json"
 
 
 def _client_id() -> str:
@@ -95,7 +95,7 @@ def auth() -> None:
 
 def _access_token() -> str:
     if not TOKEN_FILE.exists():
-        raise SystemExit("Not signed in to X. Run: lex-bookmark auth x")
+        raise SystemExit("Not signed in to X. Run: commonplace auth x")
     data = json.loads(TOKEN_FILE.read_text())
     if time.time() > data.get("expires_at", 0):
         r = httpx.post(
@@ -108,7 +108,7 @@ def _access_token() -> str:
     return data["access_token"]
 
 
-def fetch_items() -> list[Item]:
+def fetch_items(known=lambda url: False) -> list[Item]:
     headers = {"Authorization": f"Bearer {_access_token()}"}
     me = httpx.get(f"{API}/users/me", headers=headers).raise_for_status().json()["data"]
     items, token = [], None
@@ -140,6 +140,9 @@ def fetch_items() -> list[Item]:
                     details=details,
                 )
             )
+        # Bookmarks arrive newest first, and each one read costs money. Once a page holds a
+        # bookmark the commonplace already has, everything older is already in too.
+        seen_known = any(known(item.url) for item in items[-len(page.get("data", [])) :]) if page.get("data") else False
         token = page.get("meta", {}).get("next_token")
-        if not token:
+        if not token or seen_known:
             return items
