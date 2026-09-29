@@ -87,8 +87,7 @@ def main() -> None:
         print(f"{args.source}: {len(items)} seen, {len(added)} new.")
 
     elif args.cmd == "enrich":
-        todo = book.needs_context(args.source)
-        by_post = {book.source_id(d): d for d in todo if book.source_id(d)}
+        by_post = book.posts_needing_context()
         context = sources.get(args.source).fetch_context(list(by_post))
         for post_id, doc_id in by_post.items():
             book.add_context(doc_id, context.get(post_id, ["Not returned by X: the post may be deleted or protected."]))

@@ -82,13 +82,18 @@ class Commonplace:
         m = re.search(rf"^{NS}\.Bookmark\.sourceId:\s*(.+)$", self.path("Bookmark", doc_id).read_text(), re.M)
         return json.loads(m.group(1)) if m else ""
 
-    def needs_context(self, source: str) -> list[str]:
-        """Bookmarks from a source whose body has no Context section yet."""
-        out = []
+    def posts_needing_context(self) -> dict[str, str]:
+        """{post id: bookmark id} for every bookmark whose link is an X post and whose body has no
+        Context section yet — whichever source saved it (a Pinboard bookmark of an X post
+        carries only a title, so it needs the post text most of all)."""
+        out = {}
         for doc_id in self.bookmark_ids():
             text = self.path("Bookmark", doc_id).read_text()
-            if f'{NS}.Bookmark.source: "{source}"' in text and "\n## Context\n" not in text:
-                out.append(doc_id)
+            if "\n## Context\n" in text:
+                continue
+            m = re.search(r"(?:twitter|x)\.com/[^/\s\"]+/status(?:es)?/(\d+)", self.bookmark_url(doc_id))
+            if m:
+                out[m.group(1)] = doc_id
         return out
 
     def add_context(self, doc_id: str, lines: list[str]) -> None:
