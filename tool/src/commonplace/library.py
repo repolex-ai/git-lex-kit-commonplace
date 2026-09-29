@@ -99,7 +99,7 @@ class Commonplace:
         """Write a Bookmark for an item. Returns its id, or None if the commonplace already has it."""
         if self.find_bookmark(item.url):
             return None
-        title = item.title.strip() or item.url
+        title = " ".join(item.title.split()) or item.url  # one line: titles land in RDF literals
         doc_id = self.id_for(item.url, title)
         details = item.details or (["Added by hand."] if item.source == "manual" else [f"Saved on {item.source}."])
         body = [f"# {title}", "", "## Saved note", "", item.note.strip(), "", "## From the source", "", *details,

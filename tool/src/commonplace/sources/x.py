@@ -136,7 +136,7 @@ def fetch_items(known=lambda url: False) -> list[Item]:
                     url=f"https://x.com/{handle}/status/{post['id']}",
                     source=NAME,
                     source_id=post["id"],
-                    title=f"@{handle}: {post.get('text', '')[:80]}",
+                    title=f"@{handle}: {' '.join(post.get('text', '').split())[:80]}",
                     details=details,
                 )
             )
