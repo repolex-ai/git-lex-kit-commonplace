@@ -67,7 +67,12 @@ Each run ends with one `git lex save`. The tool only creates Bookmarks and PageS
 as `KEY=value` lines:
 
 - `PINBOARD_TOKEN`: from pinboard.in → settings → password, the `user:TOKEN` string.
-- `X_CLIENT_ID`: the OAuth 2.0 client id of your own X developer app. After
+- `X_CLIENT_ID`: the **OAuth 2.0 Client ID** of your own X developer app. The consumer key,
+  consumer secret and bearer token the app shows first are *not* what you need: those are for
+  OAuth 1.0a and app-only access, and reading bookmarks requires signing in as yourself. In the
+  app's settings, find **User authentication settings → Set up**, turn on OAuth 2.0, choose the
+  "Native App" (public client) type, and set the callback URL to
+  `http://127.0.0.1:8723/callback`. The OAuth 2.0 Client ID appears after you save. After
   `commonplace auth x`, the sign-in token is kept in `~/.config/commonplace/x-token.json`.
 
 **X bookmarks** go through X's official API with your own developer app. Reading your own
