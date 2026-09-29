@@ -14,6 +14,8 @@ They never go in the repo.
 
 import argparse
 import os
+
+import httpx
 from pathlib import Path
 
 from . import fetch, sources
@@ -65,7 +67,17 @@ def main() -> None:
         print(f"Added {doc_id}.")
 
     elif args.cmd == "sync":
-        items = sources.get(args.source).fetch_items(known=lambda url: book.find_bookmark(url) is not None)
+        try:
+            items = sources.get(args.source).fetch_items(known=lambda url: book.find_bookmark(url) is not None)
+        except httpx.HTTPStatusError as e:
+            r = e.response
+            hint = {
+                401: "The sign-in token was refused. Run `commonplace auth x` again.",
+                402: "The API account has no credit. Add credit in the developer console's billing page.",
+                403: "The app isn't allowed this call. Check its permissions and sign-in settings.",
+                429: "Rate limited. Wait and try again later.",
+            }.get(r.status_code, "")
+            raise SystemExit(f"{args.source}: {r.status_code} {r.reason_phrase}. {hint}\n{r.text[:500]}")
         added = [doc_id for item in items if (doc_id := book.add_bookmark(item))]
         if added:
             book.save(f"{len(added)} new bookmark(s) from {args.source} — commonplace")
