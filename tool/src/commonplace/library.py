@@ -69,6 +69,15 @@ class Commonplace:
         m = re.search(rf"^{NS}\.Bookmark\.url:\s*(.+)$", self.path("Bookmark", doc_id).read_text(), re.M)
         return json.loads(m.group(1)) if m else ""
 
+    def post_links(self, doc_id: str) -> list[str]:
+        """Outside links listed in a bookmarked post (an X post's 'Links in the post')."""
+        text = self.path("Bookmark", doc_id).read_text()
+        if "Links in the post:" not in text:
+            return []
+        block = text.split("Links in the post:", 1)[1].split("\n## ", 1)[0]
+        links = re.findall(r"^- (https?://\S+)", block, re.M)
+        return [u for u in links if urlsplit(u).netloc.lower().removeprefix("www.") not in ("x.com", "twitter.com", "t.co")]
+
     # ---- writing ----------------------------------------------------------------------------
 
     def _git_lex(self, *args: str) -> None:

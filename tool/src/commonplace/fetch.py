@@ -12,11 +12,14 @@ SKIP_HOSTS = {"x.com", "twitter.com", "mobile.twitter.com"}
 HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; commonplace; +https://github.com/repolex-ai/git-lex-kit-commonplace)"}
 
 
+def is_post(url: str) -> bool:
+    return urlsplit(url).netloc.lower().removeprefix("www.") in SKIP_HOSTS
+
+
 def page(url: str) -> tuple[bool, str, str, str]:
     """Returns (ok, title, final_url, markdown-or-reason)."""
-    host = urlsplit(url).netloc.lower().removeprefix("www.")
-    if host in SKIP_HOSTS:
-        return False, url, url, "Not fetched: X posts need the API. The post text is in the Bookmark."
+    if is_post(url):
+        return False, url, url, "Not fetched: the post has no outside link, and its text is already in the Bookmark."
     try:
         r = httpx.get(url, headers=HEADERS, follow_redirects=True, timeout=30)
         r.raise_for_status()

@@ -87,7 +87,13 @@ def main() -> None:
         todo = [b for b in book.bookmark_ids() if not book.has("PageSource", b)][: args.limit]
         ok_count = 0
         for doc_id in todo:
-            ok, title, final_url, text = fetch.page(book.bookmark_url(doc_id))
+            url = book.bookmark_url(doc_id)
+            if fetch.is_post(url):
+                # A post page can't be read without the API; its text is already in the Bookmark.
+                # What's worth fetching is the first outside link the post points at.
+                links = book.post_links(doc_id)
+                url = links[0] if links else url
+            ok, title, final_url, text = fetch.page(url)
             book.add_page_source(doc_id, title, final_url, ok, text)
             ok_count += ok
             print(f"{'ok    ' if ok else 'failed'} {doc_id}")
