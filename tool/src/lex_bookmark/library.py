@@ -88,7 +88,7 @@ class Library:
             return None
         title = item.title.strip() or item.url
         body = [f"# {title}", "", "## Saved note", "", item.note.strip(), "", "## From the source", ""]
-        body += item.details or [f"Saved on {item.source}."]
+        body += item.details or (["Added by hand."] if item.source == "manual" else [f"Saved on {item.source}."])
         self._write(
             "Bookmark",
             doc_id,
