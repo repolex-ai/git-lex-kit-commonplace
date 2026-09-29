@@ -23,7 +23,7 @@ def page(url: str) -> tuple[bool, str, str, str]:
     try:
         r = httpx.get(url, headers=HEADERS, follow_redirects=True, timeout=30)
         r.raise_for_status()
-    except httpx.HTTPError as e:
+    except Exception as e:  # any bad link (malformed host, TLS, timeout) is a failed page, never a crashed run
         return False, url, url, f"Fetch failed: {e}"
     final_url = str(r.url)
     if "html" not in r.headers.get("content-type", "html"):
