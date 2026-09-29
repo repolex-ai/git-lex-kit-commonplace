@@ -179,7 +179,9 @@ def fetch_context(post_ids: list[str]) -> dict[str, list[str]]:
             full = _full_text(post)
             if len(full) > len(post.get("text", "")):
                 lines += ["**The whole post** (the saved text was cut at 280 characters):", ""]
-                lines += [f"> {line}" for line in full.splitlines()] + [""]
+            else:
+                lines += [f"**The post by {who(post)}**, {post.get('created_at', '')}:", ""]
+            lines += [f"> {line}" for line in full.splitlines()] + [""]
             article = post.get("article") or {}
             if article:
                 lines += [f"**X Article:** {article.get('title', '(untitled)')}", ""]
