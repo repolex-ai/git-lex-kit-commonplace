@@ -29,7 +29,7 @@ def fetch_items(known=lambda url: False) -> list[Item]:
             details.append("Marked to read later.")
         items.append(
             Item(
-                url=post["href"],
+                url=post["href"].split()[0],  # some saved hrefs carry extra lines (even old logins); keep only the address
                 source=NAME,
                 source_id=post.get("hash", ""),
                 title=post.get("description", ""),
