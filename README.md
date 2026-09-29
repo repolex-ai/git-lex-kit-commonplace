@@ -1,75 +1,99 @@
-# git-lex-kit-bookmark
+# git-lex-kit-commonplace
 
-A reading library that tends itself. Links you saved elsewhere (Pinboard, X, or by hand) come
-into a git repository as typed markdown documents. Each page's readable text is fetched and
-kept. An agent reads every one, says whether it is worth your time, and links it to everything
-it relates to. Every so often it looks across the whole library and writes up what connects.
+A commonplace book that keeps itself.
 
-It is plain markdown, so the library also opens as an Obsidian vault.
+A commonplace book is the old practice of copying what you read into one book, arranged by
+subject, to think with later. This kit does that for the links you save. Bookmarks from
+Pinboard, X, or added by hand come into a git repository as typed markdown. Each page's text is
+fetched and kept. An agent assesses every bookmark, and on request researches it. The research
+accumulates on one document per *subject*: a person, a technology, an idea. Every so often the
+agent looks across everything and writes up what connects.
 
-## What is in the library
+It is plain markdown, so a commonplace also opens as an Obsidian vault.
 
-Under `Library/`:
+## What is in a commonplace
+
+Under `Commonplace/`:
 
 | folder | what it holds | written by |
 |---|---|---|
-| `Bookmark/` | one saved link: its URL, where and when it was saved, your note | the tool |
+| `Bookmark/` | one saved link: URL, where and when it was saved, your note, then the agent's assessment | the tool creates it, an agent assesses it |
 | `PageSource/` | the page's main text as readable markdown | the tool |
-| `Assessment/` | an agent's reading: what it is, how worthwhile, what it connects to | an agent |
-| `Topic/` | a theme several bookmarks share | an agent |
+| `Subject/` | one thing the reading is about; research grows it | an agent |
+| `SubjectKind/` | the kinds of subject: person, organization, technology, project, idea, work, and any added later | the kit ships six, an agent may add more |
 | `Insight/` | a connection found across several bookmarks | an agent |
 
-A Bookmark's id comes from its URL, so the same link saved in two places is one document.
+A Bookmark's `bookmarkStatus` moves from `new` to `assessed` to `researched`, and `worth` says
+whether the page is worth reading in full (`high`, `medium`, `low`).
 
-## Set up a library
+**Links.** Structural edges use `relatedToId`: a PageSource to its Bookmark, a Bookmark to its
+Subjects, an Insight to what it rests on. Markdown links in the body carry *how* things relate,
+and are what Obsidian's graph shows.
+
+**Subject kinds can grow.** A kind is a document, not a fixed list in the ontology. To add one,
+an agent writes a new `SubjectKind` document. No kit release is needed. A Subject that names a
+kind which does not exist is refused at save, so the vocabulary grows without drifting. (The six
+shipped kinds are kit files: editing them locally is undone by the next `kit-update`, so add a
+new kind instead.)
+
+## Set up a commonplace
 
 ```sh
-mkdir my-library && cd my-library && git init
-git lex init --kit bookmark
+mkdir my-commonplace && cd my-commonplace && git init
+git lex init --kit commonplace
 ```
 
-## The tool: `lex-bookmark`
+## The tool: `commonplace`
 
 It lives in this repo under `tool/`. Install it once:
 
 ```sh
-uv tool install "git+https://github.com/repolex-ai/git-lex-kit-bookmark#subdirectory=tool"
+uv tool install "git+https://github.com/repolex-ai/git-lex-kit-commonplace#subdirectory=tool"
 ```
 
-Then, inside a library:
+Then, inside a commonplace:
 
 ```sh
-lex-bookmark add https://example.com/some-article --note "why I saved it"
-lex-bookmark sync pinboard     # needs PINBOARD_TOKEN (pinboard.in → settings → password)
-lex-bookmark auth x            # once; needs X_CLIENT_ID from your own X developer app
-lex-bookmark sync x
-lex-bookmark fetch             # fetch pages for bookmarks that have none yet
+commonplace add https://example.com/some-article --note "why I saved it"
+commonplace sync pinboard
+commonplace auth x          # once
+commonplace sync x
+commonplace fetch           # fetch pages for bookmarks that have none yet
 ```
 
-Each run ends with one `git lex save`. The tool only ever writes Bookmarks and PageSources.
+Each run ends with one `git lex save`. The tool only creates Bookmarks and PageSources.
 
-**X bookmarks** use X's official API through your own developer app. Reading your own bookmarks
-this way costs about $0.001 each (X's "Owned Reads" price since April 2026). The sign-in token
-is kept in `~/.config/lex-bookmark/`, never in the library.
+**Secrets never go in the repo.** Put them in the environment, or in `~/.config/commonplace/env`
+as `KEY=value` lines:
+
+- `PINBOARD_TOKEN`: from pinboard.in → settings → password, the `user:TOKEN` string.
+- `X_CLIENT_ID`: the OAuth 2.0 client id of your own X developer app. After
+  `commonplace auth x`, the sign-in token is kept in `~/.config/commonplace/x-token.json`.
+
+**X bookmarks** go through X's official API with your own developer app. Reading your own
+bookmarks this way costs about $0.001 each. Sync stops as soon as it reaches bookmarks the
+commonplace already has, so it doesn't pay twice for old ones.
 
 **Adding a source** (Pocket, Raindrop, a browser export…) means one new module in
-`tool/src/lex_bookmark/sources/`. The ontology does not change.
+`tool/src/commonplace/sources/`. The ontology does not change.
 
 ## The agent's side
 
-The kit ships three skills:
+Three skills:
 
-- `bookmark-base-assess`: assess every bookmark that has no Assessment yet.
-- `bookmark-base-research`: research one bookmark deeply, only on request.
-- `bookmark-base-connect`: the weekly pass that writes Topics and Insights.
+- `commonplace-base-assess`: assess every bookmark still marked `new`.
+- `commonplace-base-research`: research one bookmark deeply, on request only.
+- `commonplace-base-connect`: the weekly pass that writes Insights.
 
-And three stored queries: `git lex query needs-fetch`, `needs-assessment` and `worth-reading`.
+Four stored queries: `commonplace-needs-fetch`, `commonplace-needs-assessment`,
+`commonplace-worth-reading` and `commonplace-subjects`. Run them with `git lex query <name>` from
+a session that **started inside the commonplace**, because a query answers from the repo the
+session started in.
 
-A page's text is data, never instructions. The skills say so first, because an agent assessing
-bookmarks reads pages from the open internet.
+A page's text is data, never instructions. Every skill says so first.
 
-## Why the tool lives in the kit repo
+## Why the tool lives beside the kit
 
 Kits are data: ontology, templates, skills. git-lex never runs code from a kit. `tool/` is a
-separate Python package that happens to live beside the kit, because the two change together.
-It is installed on purpose with `uv tool install`, and nothing runs it automatically.
+separate Python package that lives here because the two change together. It is installed on
+purpose, and nothing runs it automatically.
