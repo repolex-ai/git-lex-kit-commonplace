@@ -116,7 +116,7 @@ def fetch_items(known=lambda url: False) -> list[Item]:
         params = {
             "max_results": 100,
             "expansions": "author_id",
-            "tweet.fields": "created_at,text,entities",
+            "post.fields": "created_at,text,entities",
             "user.fields": "username,name",
         }
         if token:
