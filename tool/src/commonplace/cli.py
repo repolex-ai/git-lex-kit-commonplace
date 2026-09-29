@@ -93,7 +93,10 @@ def main() -> None:
                 # What's worth fetching is the first outside link the post points at.
                 links = book.post_links(doc_id)
                 url = links[0] if links else url
-            ok, title, final_url, text = fetch.page(url)
+            try:
+                ok, title, final_url, text = fetch.page(url)
+            except Exception as e:  # a page that breaks the extractor is a failed page, not a crashed run
+                ok, title, final_url, text = False, url, url, f"Could not read the page: {e}"
             book.add_page_source(doc_id, title, final_url, ok, text)
             ok_count += ok
             print(f"{'ok    ' if ok else 'failed'} {doc_id}")
