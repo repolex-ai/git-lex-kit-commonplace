@@ -129,6 +129,7 @@ class Commonplace:
         return doc_id
 
     def add_page_source(self, doc_id: str, title: str, final_url: str, ok: bool, text: str) -> None:
+        title = " ".join(title.split()) or final_url  # one line: titles land in RDF literals
         body = [f"# {title}", "", "## Text", "", text]
         self._write(
             "PageSource",
