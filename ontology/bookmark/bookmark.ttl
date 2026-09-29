@@ -1,0 +1,260 @@
+@prefix bookmark: <https://repolex.ai/ontology/bookmark/> .
+@prefix git-lex:  <https://repolex.ai/ontology/git-lex/> .
+@prefix owl:      <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs:     <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:      <http://www.w3.org/2001/XMLSchema#> .
+
+# =============================================================================
+# BOOKMARK KIT ONTOLOGY
+# =============================================================================
+# A reading library that tends itself. Links saved elsewhere (Pinboard, X, …)
+# come in as Bookmarks; a tool fetches each page's readable text as a
+# PageSource; an agent reads it and writes an Assessment; connections across
+# many bookmarks become Topics and Insights.
+#
+# Kit: bookmark
+# Namespace: bookmark: = https://repolex.ai/ontology/bookmark/
+# Folder base: Library
+# Document types (= valid `git lex create` commands):
+#   bookmark, pagesource, assessment, topic, insight
+#
+# WHO WRITES WHAT — the split is the design:
+#   Bookmark, PageSource  → written by the `lex-bookmark` tool (import, fetch).
+#                           Plain data, no model involved.
+#   Assessment, Topic, Insight → written by an agent, following the kit's skills.
+#   Neither side writes the other's documents.
+#
+# NO STATUS FIELD, deliberately. "Which bookmarks still need fetching / an
+# assessment" is answered by asking the graph which Bookmarks have no PageSource
+# or no Assessment pointing at them (the stored queries shipped with this kit).
+# A status field would be a second copy of that fact, and two copies drift.
+#
+# Every link between documents is relatedToId, written <bookmark/Class/id>.
+# =============================================================================
+
+<https://repolex.ai/ontology/bookmark> a owl:Ontology ;
+    rdfs:label "Bookmark Kit Ontology" ;
+    rdfs:comment "A reading library: saved links, their page text, and an agent's assessments and insights." ;
+    owl:versionInfo "0.1.0" .
+
+# v0.1.0 (2026-09-28, requested by goodlux, drafted by selkie): FIRST CUT.
+#   (1) + Bookmark: url (required, the dedupe key), source, sourceId, savedDate.
+#   (2) + PageSource: the fetched page as readable markdown in the body;
+#       fetchedDate, finalUrl, fetchStatus (ok / failed).
+#   (3) + Assessment: worth (high / medium / low), depth (quick / deep).
+#   (4) + Topic, Insight: universal properties only; their content is prose.
+#   IDENTITY: convention anchors (<class>Id) on every class, same as the soul kit.
+#   A Bookmark's id is derived from its URL by the tool, so the same link saved
+#   in two places is one document.
+#   `source` is a plain string, NOT an enum, so a new source (Pocket, Raindrop,
+#   a browser export…) needs no ontology change.
+#   DELIBERATELY NOT ADDED:
+#   - status: derivable from the graph (see header).
+#   - tags / sourceTags: the source's tags go in the Bookmark body, where the
+#     agent reads them. No application reads them as data yet.
+#   - author: an X post's author goes in the body for the same reason.
+
+# -----------------------------------------------------------------------------
+# Bookmark
+# -----------------------------------------------------------------------------
+
+bookmark:Bookmark a owl:Class ;
+    rdfs:subClassOf git-lex:Thing ;
+    git-lex:foldered true ;
+    rdfs:label "Bookmark" ;
+    rdfs:comment "One saved link, as it arrived from where it was saved." ;
+    git-lex:authoringGuidance """
+## Saved note
+What the person wrote when they saved it, verbatim. Empty if nothing.
+
+## From the source
+The source's own details: tags, the post text and its author for an X bookmark.
+""" .
+
+bookmark:bookmarkId a owl:DatatypeProperty ;
+    rdfs:label "bookmarkId" ;
+    rdfs:comment "Unique identifier — same as the filename; the tool derives it from the URL, do not hand-pick one." ;
+    rdfs:domain bookmark:Bookmark ;
+    rdfs:range xsd:string .
+
+bookmark:url a owl:DatatypeProperty ;
+    rdfs:label "url" ;
+    rdfs:comment "The saved link, exactly as saved — do not clean or shorten it." ;
+    rdfs:domain bookmark:Bookmark ;
+    rdfs:range xsd:anyURI .
+
+bookmark:source a owl:DatatypeProperty ;
+    rdfs:label "source" ;
+    rdfs:comment "Where it was saved, lowercase: pinboard, x, manual, or another source's name." ;
+    rdfs:domain bookmark:Bookmark ;
+    rdfs:range xsd:string .
+
+bookmark:sourceId a owl:DatatypeProperty ;
+    rdfs:label "sourceId" ;
+    rdfs:comment "The item's id at its source (the X post id, the Pinboard hash) — never invent one." ;
+    rdfs:domain bookmark:Bookmark ;
+    rdfs:range xsd:string .
+
+bookmark:savedDate a owl:DatatypeProperty ;
+    rdfs:label "savedDate" ;
+    rdfs:comment "When it was saved at the source, ISO-8601 with offset — not when it was imported." ;
+    rdfs:domain bookmark:Bookmark ;
+    rdfs:range xsd:dateTime .
+
+# -----------------------------------------------------------------------------
+# PageSource — the page's readable text, fetched by the tool
+# -----------------------------------------------------------------------------
+
+bookmark:PageSource a owl:Class ;
+    rdfs:subClassOf git-lex:Thing ;
+    git-lex:foldered true ;
+    rdfs:label "PageSource" ;
+    rdfs:comment "The readable text of a bookmarked page, fetched once and kept. Written by the tool, not by hand." ;
+    git-lex:authoringGuidance """
+## Text
+The page's main content as markdown. Nothing added, nothing summarised.
+""" .
+
+bookmark:pageSourceId a owl:DatatypeProperty ;
+    rdfs:label "pageSourceId" ;
+    rdfs:comment "Unique identifier — the same as its Bookmark's id." ;
+    rdfs:domain bookmark:PageSource ;
+    rdfs:range xsd:string .
+
+bookmark:fetchedDate a owl:DatatypeProperty ;
+    rdfs:label "fetchedDate" ;
+    rdfs:comment "When the page was fetched, ISO-8601 with offset." ;
+    rdfs:domain bookmark:PageSource ;
+    rdfs:range xsd:dateTime .
+
+bookmark:finalUrl a owl:DatatypeProperty ;
+    rdfs:label "finalUrl" ;
+    rdfs:comment "The address the page was actually read from, after redirects." ;
+    rdfs:domain bookmark:PageSource ;
+    rdfs:range xsd:anyURI .
+
+bookmark:FetchStatusValue a rdfs:Datatype ;
+    owl:oneOf ( "ok" "failed" ) .
+
+bookmark:fetchStatus a owl:DatatypeProperty ;
+    rdfs:label "fetchStatus" ;
+    rdfs:comment "One of: ok, failed. A failed fetch keeps its reason in the body." ;
+    rdfs:domain bookmark:PageSource ;
+    rdfs:range bookmark:FetchStatusValue .
+
+# -----------------------------------------------------------------------------
+# Assessment — an agent's reading of one bookmark
+# -----------------------------------------------------------------------------
+
+bookmark:Assessment a owl:Class ;
+    rdfs:subClassOf git-lex:Thing ;
+    git-lex:foldered true ;
+    rdfs:label "Assessment" ;
+    rdfs:comment "An agent's reading of one bookmark: what it is, whether it is worth the time, what it connects to." ;
+    git-lex:authoringGuidance """
+## What it is
+Two or three sentences: what the page says, in plain words.
+
+## Why it might matter
+Why this person may have saved it, and what they would get from reading it.
+
+## Connections
+Other bookmarks, Topics or Insights it relates to, and how. Link each one.
+""" .
+
+bookmark:assessmentId a owl:DatatypeProperty ;
+    rdfs:label "assessmentId" ;
+    rdfs:comment "Unique identifier — the same as the Bookmark's id it assesses." ;
+    rdfs:domain bookmark:Assessment ;
+    rdfs:range xsd:string .
+
+bookmark:WorthValue a rdfs:Datatype ;
+    owl:oneOf ( "high" "medium" "low" ) .
+
+bookmark:worth a owl:DatatypeProperty ;
+    rdfs:label "worth" ;
+    rdfs:comment "One of: high, medium, low — worth reading in full, judged from the page text, not the title." ;
+    rdfs:domain bookmark:Assessment ;
+    rdfs:range bookmark:WorthValue .
+
+bookmark:DepthValue a rdfs:Datatype ;
+    owl:oneOf ( "quick" "deep" ) .
+
+bookmark:depth a owl:DatatypeProperty ;
+    rdfs:label "depth" ;
+    rdfs:comment "One of: quick (from the page alone), deep (researched beyond the page, on request)." ;
+    rdfs:domain bookmark:Assessment ;
+    rdfs:range bookmark:DepthValue .
+
+# -----------------------------------------------------------------------------
+# Topic and Insight — the connections
+# -----------------------------------------------------------------------------
+
+bookmark:Topic a owl:Class ;
+    rdfs:subClassOf git-lex:Thing ;
+    git-lex:foldered true ;
+    rdfs:label "Topic" ;
+    rdfs:comment "A theme several bookmarks share. Link its bookmarks with relatedToId." ;
+    git-lex:authoringGuidance """
+## What it covers
+The theme in a few sentences, and where its edges are.
+""" .
+
+bookmark:topicId a owl:DatatypeProperty ;
+    rdfs:label "topicId" ;
+    rdfs:comment "Unique identifier for this topic — same as the filename." ;
+    rdfs:domain bookmark:Topic ;
+    rdfs:range xsd:string .
+
+bookmark:Insight a owl:Class ;
+    rdfs:subClassOf git-lex:Thing ;
+    git-lex:foldered true ;
+    rdfs:label "Insight" ;
+    rdfs:comment "A connection found across several bookmarks — the payoff. Link every bookmark it came from." ;
+    git-lex:authoringGuidance """
+## The insight
+The finding, stated plainly in a sentence or two.
+
+## Where it came from
+Which bookmarks and topics led to it, and what each one contributed.
+""" .
+
+bookmark:insightId a owl:DatatypeProperty ;
+    rdfs:label "insightId" ;
+    rdfs:comment "Unique identifier for this insight — same as the filename." ;
+    rdfs:domain bookmark:Insight ;
+    rdfs:range xsd:string .
+
+# -----------------------------------------------------------------------------
+# Cardinality
+# -----------------------------------------------------------------------------
+
+bookmark:Bookmark rdfs:subClassOf
+    [ a owl:Restriction ; owl:onProperty bookmark:bookmarkId ; owl:minCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty bookmark:bookmarkId ; owl:maxCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty bookmark:url        ; owl:minCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty bookmark:url        ; owl:maxCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty bookmark:source     ; owl:maxCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty bookmark:sourceId   ; owl:maxCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty bookmark:savedDate  ; owl:maxCardinality 1 ] .
+
+bookmark:PageSource rdfs:subClassOf
+    [ a owl:Restriction ; owl:onProperty bookmark:pageSourceId ; owl:minCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty bookmark:pageSourceId ; owl:maxCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty bookmark:fetchedDate  ; owl:maxCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty bookmark:finalUrl     ; owl:maxCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty bookmark:fetchStatus  ; owl:maxCardinality 1 ] .
+
+bookmark:Assessment rdfs:subClassOf
+    [ a owl:Restriction ; owl:onProperty bookmark:assessmentId ; owl:minCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty bookmark:assessmentId ; owl:maxCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty bookmark:worth        ; owl:maxCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty bookmark:depth        ; owl:maxCardinality 1 ] .
+
+bookmark:Topic rdfs:subClassOf
+    [ a owl:Restriction ; owl:onProperty bookmark:topicId ; owl:minCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty bookmark:topicId ; owl:maxCardinality 1 ] .
+
+bookmark:Insight rdfs:subClassOf
+    [ a owl:Restriction ; owl:onProperty bookmark:insightId ; owl:minCardinality 1 ] ,
+    [ a owl:Restriction ; owl:onProperty bookmark:insightId ; owl:maxCardinality 1 ] .

@@ -1,0 +1,17 @@
+# git-lex kit configuration
+# Bookmark kit — a reading library that tends itself: saved links come in,
+# their pages are fetched as text, and an agent assesses and connects them.
+
+name: bookmark
+
+# Domain kit: a bookmark library is its own repo, set up with
+# `git lex init --kit bookmark`.
+scope: domain
+
+# Folder installation — create class folders from the ontology.
+install folders: true
+folder base: Library
+folder ontology: bookmark.ttl
+
+init_prompts:
+  - agent_name
