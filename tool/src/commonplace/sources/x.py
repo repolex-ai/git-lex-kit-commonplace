@@ -146,3 +146,52 @@ def fetch_items(known=lambda url: False) -> list[Item]:
         token = page.get("meta", {}).get("next_token")
         if not token or seen_known:
             return items
+
+
+def _full_text(post: dict) -> str:
+    """A long post's whole text lives in note_post; `text` stops at 280 characters."""
+    note = post.get("note_post") or post.get("note_tweet") or {}
+    return (note.get("text") or post.get("text") or "").strip()
+
+
+def fetch_context(post_ids: list[str]) -> dict[str, list[str]]:
+    """For each post id, markdown lines giving the context a bookmark needs to be understood:
+    the full text of a long post, its X Article, and the post it replies to or quotes."""
+    headers = {"Authorization": f"Bearer {_access_token()}"}
+    out: dict[str, list[str]] = {}
+    for i in range(0, len(post_ids), 100):
+        params = {
+            "ids": ",".join(post_ids[i : i + 100]),
+            "post.fields": "text,note_post,article,created_at,author_id,referenced_posts,conversation_id",
+            "expansions": "author_id,referenced_posts.id,referenced_posts.id.author_id",
+            "user.fields": "username,name",
+        }
+        page = httpx.get(f"{API}/tweets", headers=headers, params=params).raise_for_status().json()
+        inc = page.get("includes", {})
+        users = {u["id"]: u for u in inc.get("users", [])}
+        refs = {p["id"]: p for p in inc.get("posts", inc.get("tweets", []))}
+
+        def who(p: dict) -> str:
+            return "@" + users.get(p.get("author_id"), {}).get("username", "unknown")
+
+        for post in page.get("data", []):
+            lines: list[str] = []
+            full = _full_text(post)
+            if len(full) > len(post.get("text", "")):
+                lines += ["**The whole post** (the saved text was cut at 280 characters):", ""]
+                lines += [f"> {line}" for line in full.splitlines()] + [""]
+            article = post.get("article") or {}
+            if article:
+                lines += [f"**X Article:** {article.get('title', '(untitled)')}", ""]
+                body = article.get("plain_text") or article.get("preview_text") or ""
+                lines += [f"> {line}" for line in body.splitlines()] + ([""] if body else [])
+            for ref in post.get("referenced_posts", post.get("referenced_tweets", [])):
+                target = refs.get(ref.get("id"))
+                label = {"replied_to": "In reply to", "quoted": "Quoting", "retweeted": "Reposting"}.get(ref.get("type"), "Referencing")
+                if not target:
+                    lines += [f"**{label}** a post that is deleted or not visible ({ref.get('id')}).", ""]
+                    continue
+                lines += [f"**{label} {who(target)}**, {target.get('created_at', '')}:", ""]
+                lines += [f"> {line}" for line in _full_text(target).splitlines()] + [""]
+            out[post["id"]] = lines or ["No further context: the post stands on its own."]
+    return out

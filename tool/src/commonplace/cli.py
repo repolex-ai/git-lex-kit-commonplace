@@ -3,6 +3,7 @@
   commonplace add <url> [--title T] [--note N]   add one link by hand
   commonplace sync <source>                      import new bookmarks (pinboard, x)
   commonplace fetch [--limit N]                  fetch pages for bookmarks without a PageSource
+  commonplace enrich x                           add each X bookmark's context: whole post, Article, reply/quote
   commonplace auth x                             sign in to X once
 
 Run inside the commonplace repo (or pass --repo). Each run ends with one `git lex save`.
@@ -47,6 +48,8 @@ def main() -> None:
     s.add_argument("source")
     f = sub.add_parser("fetch")
     f.add_argument("--limit", type=int, default=50)
+    en = sub.add_parser("enrich")
+    en.add_argument("source", choices=["x"])
     au = sub.add_parser("auth")
     au.add_argument("source", choices=["x"])
     args = ap.parse_args()
@@ -82,6 +85,16 @@ def main() -> None:
         if added:
             book.save(f"{len(added)} new bookmark(s) from {args.source} — commonplace")
         print(f"{args.source}: {len(items)} seen, {len(added)} new.")
+
+    elif args.cmd == "enrich":
+        todo = book.needs_context(args.source)
+        by_post = {book.source_id(d): d for d in todo if book.source_id(d)}
+        context = sources.get(args.source).fetch_context(list(by_post))
+        for post_id, doc_id in by_post.items():
+            book.add_context(doc_id, context.get(post_id, ["Not returned by X: the post may be deleted or protected."]))
+        if by_post:
+            book.save(f"context added to {len(by_post)} {args.source} bookmark(s) — commonplace")
+        print(f"{args.source}: context added to {len(by_post)} bookmark(s).")
 
     elif args.cmd == "fetch":
         todo = [b for b in book.bookmark_ids() if not book.has("PageSource", b)][: args.limit]

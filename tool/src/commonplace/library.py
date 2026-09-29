@@ -78,6 +78,30 @@ class Commonplace:
         links = re.findall(r"^- (https?://\S+)", block, re.M)
         return [u for u in links if urlsplit(u).netloc.lower().removeprefix("www.") not in ("x.com", "twitter.com", "t.co")]
 
+    def source_id(self, doc_id: str) -> str:
+        m = re.search(rf"^{NS}\.Bookmark\.sourceId:\s*(.+)$", self.path("Bookmark", doc_id).read_text(), re.M)
+        return json.loads(m.group(1)) if m else ""
+
+    def needs_context(self, source: str) -> list[str]:
+        """Bookmarks from a source whose body has no Context section yet."""
+        out = []
+        for doc_id in self.bookmark_ids():
+            text = self.path("Bookmark", doc_id).read_text()
+            if f'{NS}.Bookmark.source: "{source}"' in text and "\n## Context\n" not in text:
+                out.append(doc_id)
+        return out
+
+    def add_context(self, doc_id: str, lines: list[str]) -> None:
+        """Insert a Context section just before the Assessment. The tool's section, not the agent's."""
+        path = self.path("Bookmark", doc_id)
+        text = path.read_text()
+        section = "## Context\n\n" + "\n".join(lines).strip() + "\n\n"
+        if "\n## Assessment" in text:
+            text = text.replace("\n## Assessment", "\n" + section + "## Assessment", 1)
+        else:
+            text = text.rstrip() + "\n\n" + section
+        path.write_text(text)
+
     # ---- writing ----------------------------------------------------------------------------
 
     def _git_lex(self, *args: str) -> None:
